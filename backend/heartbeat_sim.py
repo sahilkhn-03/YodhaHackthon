@@ -54,6 +54,8 @@ class SimulationEngine:
         self.stress_level: float = 0.0
         self.task: Optional[asyncio.Task] = None
         self.websocket_clients: List[WebSocket] = []
+        self.stress_button_active: bool = False
+        self.stress_button_start_time: Optional[float] = None
         
         # Simulation parameters
         self.min_bpm = 60
@@ -76,15 +78,27 @@ class SimulationEngine:
         4. Recovery: Slow return to baseline
         """
         
-        # Random stress events (simulate anxiety, exercise, etc.)
-        # Variable probability: 5-8% chance per update for realistic sporadic stress
-        stress_probability = random.uniform(0.05, 0.08)
-        if random.random() < stress_probability:
-            self.stress_level = random.uniform(0.3, 0.9)
+        # Check if stress button is active (5 second duration)
+        if self.stress_button_active and self.stress_button_start_time:
+            elapsed = time.time() - self.stress_button_start_time
+            if elapsed < 5.0:
+                # Keep stress high for 5 seconds with fluctuation
+                self.stress_level = random.uniform(0.7, 0.95)
+            else:
+                # After 5 seconds, deactivate and start decay
+                self.stress_button_active = False
+                self.stress_button_start_time = None
+        else:
+            # Random stress events (simulate anxiety, exercise, etc.)
+            # Variable probability: 5-8% chance per update for realistic sporadic stress
+            stress_probability = random.uniform(0.05, 0.08)
+            if random.random() < stress_probability:
+                self.stress_level = random.uniform(0.3, 0.9)
         
-        # Stress decay (return to baseline)
-        self.stress_level *= 0.98
-        self.stress_level = max(0.0, self.stress_level)
+        # Stress decay (return to baseline) - only when button not active
+        if not self.stress_button_active:
+            self.stress_level *= 0.98
+            self.stress_level = max(0.0, self.stress_level)
         
         # Calculate target heart rate based on stress
         if self.stress_level > self.stress_threshold:
@@ -220,6 +234,34 @@ async def start_simulation():
         "message": "Simulation started",
         "state": engine.state.value,
         "base_bpm": engine.base_bpm
+    }
+
+
+@app.post("/simulation/stress-test")
+async def stress_test():
+    """
+    Trigger manual stress test.
+    
+    Simulates a stress event for exactly 5 seconds, then returns to normal.
+    Heart rate will fluctuate during the stress period.
+    """
+    if engine.state != SimulationState.RUNNING:
+        return JSONResponse(
+            status_code=400,
+            content={
+                "error": "Simulation not running",
+                "message": "Start simulation first using POST /simulation/start"
+            }
+        )
+    
+    # Activate stress button timer
+    engine.stress_button_active = True
+    engine.stress_button_start_time = time.time()
+    
+    return {
+        "message": "Stress test initiated",
+        "duration_seconds": 5,
+        "state": engine.state.value
     }
 
 
@@ -523,6 +565,11 @@ async def live_monitor():
         .btn-start:hover { background: #00ff41; }
         .btn-stress:hover { background: #ff4136; }
         .btn-stop:hover { background: #ff851b; }
+        .btn-stress:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            background: rgba(255, 65, 54, 0.2);
+        }
         
         /* Status */
         .status {
@@ -646,6 +693,7 @@ async def live_monitor():
             <!-- Controls -->
             <div class="controls">
                 <button class="btn-start" onclick="startSimulation()">▶ START MONITOR</button>
+                <button class="btn-stress" onclick="triggerStress()" id="stressBtn">⚡ STRESS TEST (5s)</button>
                 <button class="btn-stop" onclick="stopSimulation()">⏹ STOP</button>
             </div>
             
@@ -819,6 +867,29 @@ async def live_monitor():
                 ekgData = [];
             } catch (error) {
                 addLog(`❌ Error: ${error.message}`);
+            }
+        }
+
+        async function triggerStress() {
+            const btn = document.getElementById('stressBtn');
+            btn.disabled = true;
+            btn.textContent = '⚡ STRESS ACTIVE...';
+            
+            try {
+                const response = await fetch(`${API_BASE}/simulation/stress-test`, { method: 'POST' });
+                const data = await response.json();
+                addLog('⚡ Stress test initiated (5 seconds)');
+                
+                // Re-enable button after 5 seconds
+                setTimeout(() => {
+                    btn.disabled = false;
+                    btn.textContent = '⚡ STRESS TEST (5s)';
+                    addLog('✅ Stress test complete');
+                }, 5000);
+            } catch (error) {
+                addLog(`❌ Error: ${error.message}`);
+                btn.disabled = false;
+                btn.textContent = '⚡ STRESS TEST (5s)';
             }
         }
 

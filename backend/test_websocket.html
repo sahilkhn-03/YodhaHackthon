@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NeuroBalance AI - WebSocket Test</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            border-radius: 10px;
+            padding: 30px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+        }
+        .status {
+            padding: 10px;
+            border-radius: 5px;
+            margin: 20px 0;
+            font-weight: bold;
+        }
+        .connected { background: #d4edda; color: #155724; }
+        .disconnected { background: #f8d7da; color: #721c24; }
+        .data-box {
+            background: #f8f9fa;
+            border-left: 4px solid #007bff;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 5px;
+        }
+        .metric {
+            font-size: 24px;
+            font-weight: bold;
+            margin: 10px 0;
+        }
+        .stress { color: #dc3545; }
+        .heart { color: #fd7e14; }
+        .facial { color: #6f42c1; }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 5px;
+        }
+        button:hover { background: #0056b3; }
+        .disconnect-btn { background: #dc3545; }
+        .disconnect-btn:hover { background: #c82333; }
+        #log {
+            background: #000;
+            color: #0f0;
+            padding: 15px;
+            border-radius: 5px;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            max-height: 300px;
+            overflow-y: auto;
+            margin-top: 20px;
+        }
+        .log-entry { margin: 5px 0; }
+        .timestamp { color: #888; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧠 NeuroBalance AI - WebSocket Test</h1>
+        <p>Real-time stress monitoring simulation</p>
+        
+        <div id="status" class="status disconnected">⚫ Disconnected</div>
+        
+        <button onclick="connect()">🔌 Connect</button>
+        <button onclick="disconnect()" class="disconnect-btn">⏹️ Disconnect</button>
+        
+        <div class="data-box">
+            <div class="metric stress">
+                Stress Score: <span id="stress">--</span>
+            </div>
+            <div class="metric heart">
+                Heart Rate: <span id="heartRate">--</span> BPM
+            </div>
+            <div class="metric facial">
+                Facial Stress: <span id="facial">--</span>
+            </div>
+            <div style="color: #666; margin-top: 10px; font-size: 14px;">
+                Last update: <span id="timestamp">--</span>
+            </div>
+        </div>
+        
+        <h3>📊 Connection Log</h3>
+        <div id="log"></div>
+    </div>
+
+    <script>
+        let ws = null;
+        const statusDiv = document.getElementById('status');
+        const logDiv = document.getElementById('log');
+
+        function log(message, type = 'info') {
+            const time = new Date().toLocaleTimeString();
+            const entry = document.createElement('div');
+            entry.className = 'log-entry';
+            entry.innerHTML = `<span class="timestamp">[${time}]</span> ${message}`;
+            logDiv.insertBefore(entry, logDiv.firstChild);
+        }
+
+        function connect() {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                log('⚠️ Already connected!', 'warning');
+                return;
+            }
+
+            log('🔌 Connecting to ws://localhost:8000/ws/simulation...');
+            ws = new WebSocket('ws://localhost:8000/ws/simulation');
+
+            ws.onopen = () => {
+                statusDiv.textContent = '🟢 Connected';
+                statusDiv.className = 'status connected';
+                log('✅ Connected successfully!');
+            };
+
+            ws.onmessage = (event) => {
+                const data = JSON.parse(event.data);
+                
+                if (data.type === 'connected') {
+                    log(`📡 ${data.message}`);
+                } else {
+                    // Update UI with stress data
+                    document.getElementById('stress').textContent = data.stress_score.toFixed(3);
+                    document.getElementById('heartRate').textContent = data.heart_rate;
+                    document.getElementById('facial').textContent = data.facial_stress.toFixed(3);
+                    document.getElementById('timestamp').textContent = new Date(data.timestamp).toLocaleTimeString();
+                }
+            };
+
+            ws.onerror = (error) => {
+                log('❌ WebSocket error - Is the server running?', 'error');
+                statusDiv.textContent = '⚫ Error';
+                statusDiv.className = 'status disconnected';
+            };
+
+            ws.onclose = () => {
+                log('🔌 Connection closed');
+                statusDiv.textContent = '⚫ Disconnected';
+                statusDiv.className = 'status disconnected';
+            };
+        }
+
+        function disconnect() {
+            if (ws) {
+                ws.close();
+                log('⏹️ Disconnected by user');
+            }
+        }
+
+        // Auto-connect on page load
+        window.onload = () => {
+            log('👋 Ready to connect!');
+        };
+    </script>
+</body>
+</html>

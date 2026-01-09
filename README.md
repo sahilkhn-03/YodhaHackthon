@@ -5,7 +5,7 @@
 ---
 
 ## Project Overview
-**NeuroBalance AI** is a non-invasive, AI-driven psychosomatic assessment platform that passively evaluates mental-physical stress balance using multimodal signals. Our solution provides real-time, clinician-readable insights without requiring specialized hardware.
+**NeuroBalance AI** is a  non-invasive, AI-driven psychosomatic assessment platform that passively evaluates mental-physical stress balance using multimodal signals. Our solution provides real-time, clinician-readable insights without requiring specialized hardware.
 
 ### Core Innovation
 - **Zero-hardware approach** - Uses standard  webcam & microphone
